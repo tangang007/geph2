@@ -10,6 +10,7 @@ import (
 
 	"github.com/elazarl/goproxy"
 	"github.com/geph-official/geph2/cmd/geph-client/chinalist"
+	"github.com/geph-official/geph2/cmd/geph-client/extralist"
 	"github.com/geph-official/geph2/libs/cwl"
 	"github.com/geph-official/geph2/libs/tinysocks"
 	"golang.org/x/time/rate"
@@ -172,5 +173,5 @@ func listenSocks() {
 
 // TODO bypass local domains
 func bypassHost(str string) bool {
-	return bypassChinese && chinalist.IsChinese(str)
+	return (bypassChinese && chinalist.IsChinese(str)) || (extraList!= "" && extralist.InExtralist(str))
 }

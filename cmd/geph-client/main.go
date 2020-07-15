@@ -20,6 +20,8 @@ import (
 	"github.com/acarl005/stripansi"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/geph-official/geph2/libs/bdclient"
+	"github.com/geph-official/geph2/cmd/geph-client/extralist"
+	"github.com/radovskyb/watcher"
 	"golang.org/x/net/proxy"
 
 	log "github.com/sirupsen/logrus"
@@ -45,6 +47,10 @@ var statsAddr string
 var dnsAddr string
 var fakeDNS bool
 var bypassChinese bool
+var extraList string
+var extraListUrl string
+var extraListSourcePattern string
+var extraListUpdateInterval int64
 
 var singleHop string
 var upstreamProxy string
@@ -132,7 +138,12 @@ func main() {
 	flag.StringVar(&singleHop, "singleHop", "", "if set in form pk@host:port, location of a single-hop server. OVERRIDES BINDER AND AUTHENTICATION!")
 	flag.BoolVar(&bypassChinese, "bypassChinese", false, "bypass proxy for Chinese domains")
 	flag.BoolVar(&forceWarpfront, "forceWarpfront", false, "force use of warpfront")
+	flag.StringVar(&extraList, "extraList", "", "user defined extra whitelist")
+	flag.StringVar(&extraListUrl, "extraListUrl", "", "user defined extra whitelist update Source")
+	flag.StringVar(&extraListSourcePattern, "extraListSourcePattern", "dnsmasq-china-list", "Pattern of Extra list source")
+	flag.Int64Var(&extraListUpdateInterval, "extraListUpdateInterval", int64(30), "Interval of updating extraList from URL")
 	iniflags.Parse()
+
 	hackDNS()
 	if dnsAddr != "" {
 		go doDNS()
@@ -167,6 +178,53 @@ func main() {
 			os.Exit(10)
 		}()
 	}
+
+	if extraList != "" {
+		log.Println("Loading from ", extraList)
+		extralist.LoadExtralist(extraList)
+		// notify extra list file changes
+		w := watcher.New()
+		w.SetMaxEvents(1)
+		w.FilterOps(watcher.Write)
+		if err := w.Add(extraList); err != nil {
+			log.Error(err)
+		}
+		go func() {
+			for {
+				select {
+				case event := <-w.Event:
+					_ = event
+					log.Printf("ExtraList file [%v] changed!Reloading...", extraList) // Print the event's info.
+					extralist.LoadExtralist(extraList)
+				case err := <-w.Error:
+					log.Error(err)
+					return
+				}
+			}
+		}()
+
+		go func() {
+			if err := w.Start(time.Millisecond * 100); err != nil {
+				log.Error(err)
+			}
+		}()
+
+		go func() {
+			for {
+				time.Sleep(time.Duration(extraListUpdateInterval) *time.Second)
+				log.Printf("Updating ExtraList file [%v] from [%v] using pattern [%v]", extraList, extraListUrl, extraListSourcePattern)
+				start := time.Now()
+				err := extralist.UpdateExtraList(extraListUrl, extraList, extraListSourcePattern)
+				elapsed := time.Since(start)
+				log.Infof("Update cost %v", elapsed)
+				if err != nil {
+					log.Error(err)
+				}
+			}
+		}()
+
+	}
+
 	if singleHop == "" {
 		binderRace()
 		if binderProxy != "" {

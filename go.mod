@@ -29,6 +29,7 @@ require (
 	github.com/nullchinchilla/natrium v1.1.1
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.8.1
+	github.com/radovskyb/watcher v1.0.7
 	github.com/sirupsen/logrus v1.4.2
 	github.com/templexxx/cpufeat v0.0.0-20180724012125-cef66df7f161 // indirect
 	github.com/templexxx/xor v0.0.0-20181023030647-4e92f724b73b
