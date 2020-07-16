@@ -141,7 +141,7 @@ func main() {
 	flag.StringVar(&extraList, "extraList", "", "user defined extra whitelist")
 	flag.StringVar(&extraListUrl, "extraListUrl", "", "user defined extra whitelist update Source")
 	flag.StringVar(&extraListSourcePattern, "extraListSourcePattern", "dnsmasq-china-list", "Pattern of Extra list source")
-	flag.Int64Var(&extraListUpdateInterval, "extraListUpdateInterval", int64(30), "Interval of updating extraList from URL")
+	flag.Int64Var(&extraListUpdateInterval, "extraListUpdateInterval", int64(86400), "Interval of updating extraList from URL")
 	iniflags.Parse()
 
 	hackDNS()
