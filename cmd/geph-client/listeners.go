@@ -11,6 +11,7 @@ import (
 	"github.com/elazarl/goproxy"
 	"github.com/geph-official/geph2/cmd/geph-client/chinalist"
 	"github.com/geph-official/geph2/cmd/geph-client/extralist"
+	"github.com/geph-official/geph2/cmd/geph-client/locallist"
 	"github.com/geph-official/geph2/libs/cwl"
 	"github.com/geph-official/geph2/libs/tinysocks"
 	"golang.org/x/time/rate"
@@ -101,6 +102,8 @@ func listenSocks() {
 				return
 			}
 			cmd, rmAddrProt, err := tinysocks.ReadRequest(cl)
+			//log.Debugln("rmAddrprot:", rmAddrProt)
+			//log.Debugln("cmd:", cmd)
 			if err != nil {
 				log.Debugln("Bad SOCKS5 request:", err)
 				return
@@ -173,5 +176,19 @@ func listenSocks() {
 
 // TODO bypass local domains
 func bypassHost(str string) bool {
-	return (bypassChinese && chinalist.IsChinese(str)) || (extraList!= "" && extralist.InExtralist(str))
+	detect_ip := net.ParseIP(str)
+	if detect_ip == nil {
+		return (bypassChinese && chinalist.IsChinese(str)) || (extraList!= "" && extralist.InExtralist(str))
+	} else {
+		if detect_ip.IsLoopback() {
+			return true
+		}
+		bypass, err := locallist.IsLocalList(str)
+		if err != nil {
+			log.Error("Error while matching CIDR:", err)
+			return false
+		}
+		return bypass
+	}
+	
 }

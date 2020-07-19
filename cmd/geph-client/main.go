@@ -21,7 +21,9 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/geph-official/geph2/libs/bdclient"
 	"github.com/geph-official/geph2/cmd/geph-client/extralist"
-	"github.com/radovskyb/watcher"
+	//"github.com/geph-official/geph2/cmd/geph-client/cidr"
+	"github.com/geph-official/geph2/cmd/geph-client/locallist"
+	_ "github.com/radovskyb/watcher"
 	"golang.org/x/net/proxy"
 
 	log "github.com/sirupsen/logrus"
@@ -49,6 +51,7 @@ var fakeDNS bool
 var bypassChinese bool
 var extraList string
 var extraListUrl string
+var extraListConfigFile string
 var extraListSourcePattern string
 var extraListUpdateInterval int64
 
@@ -139,6 +142,7 @@ func main() {
 	flag.BoolVar(&bypassChinese, "bypassChinese", false, "bypass proxy for Chinese domains")
 	flag.BoolVar(&forceWarpfront, "forceWarpfront", false, "force use of warpfront")
 	flag.StringVar(&extraList, "extraList", "", "user defined extra whitelist")
+	flag.StringVar(&extraListConfigFile, "extraListConfigFile", "", "definitions of extralist")
 	flag.StringVar(&extraListUrl, "extraListUrl", "", "user defined extra whitelist update Source")
 	flag.StringVar(&extraListSourcePattern, "extraListSourcePattern", "dnsmasq-china-list", "Pattern of Extra list source")
 	flag.Int64Var(&extraListUpdateInterval, "extraListUpdateInterval", int64(86400), "Interval of updating extraList from URL")
@@ -179,51 +183,7 @@ func main() {
 		}()
 	}
 
-	if extraList != "" {
-		log.Println("Loading from ", extraList)
-		extralist.LoadExtralist(extraList)
-		// notify extra list file changes
-		w := watcher.New()
-		w.SetMaxEvents(1)
-		w.FilterOps(watcher.Write)
-		if err := w.Add(extraList); err != nil {
-			log.Error(err)
-		}
-		go func() {
-			for {
-				select {
-				case event := <-w.Event:
-					_ = event
-					log.Printf("ExtraList file [%v] changed!Reloading...", extraList) // Print the event's info.
-					extralist.LoadExtralist(extraList)
-				case err := <-w.Error:
-					log.Error(err)
-					return
-				}
-			}
-		}()
-
-		go func() {
-			if err := w.Start(time.Millisecond * 100); err != nil {
-				log.Error(err)
-			}
-		}()
-
-		go func() {
-			for {
-				time.Sleep(time.Duration(extraListUpdateInterval) *time.Second)
-				log.Printf("Updating ExtraList file [%v] from [%v] using pattern [%v]", extraList, extraListUrl, extraListSourcePattern)
-				start := time.Now()
-				err := extralist.UpdateExtraList(extraListUrl, extraList, extraListSourcePattern)
-				elapsed := time.Since(start)
-				log.Infof("Update cost %v", elapsed)
-				if err != nil {
-					log.Error(err)
-				}
-			}
-		}()
-
-	}
+	locallist.InitCIDRWithLocal()
 
 	if singleHop == "" {
 		binderRace()
@@ -305,6 +265,35 @@ func main() {
 		}
 	}()
 	go listenHTTP()
+
+	if extraListConfigFile != "" {
+		extralist.ParseConfigFile(extraListConfigFile)
+		proxy_addr,_ := url.Parse(fmt.Sprintf("http://%s",httpAddr))
+		download_client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxy_addr)}}
+		for _, cfg := range extralist.SourceConfigs {
+			if cfg.Url() != "" {
+				log.Printf("Updating ExtraList from [%v] to file [%v] using pattern [%v]", cfg.Url(), cfg.Dst(), cfg.Pattern())
+				err := extralist.UpdateExtraList(cfg.Url(), cfg.Dst(), cfg.Pattern(), download_client)
+				if err != nil {
+					log.Error(err)
+				}
+				go func() {
+					for {
+						time.Sleep(time.Second * 20)
+						start := time.Now()
+						err := extralist.UpdateExtraList(cfg.Url(), cfg.Dst(), cfg.Pattern(), download_client)
+						elapsed := time.Since(start)
+						log.Infof("Update cost %v", elapsed)
+						if err != nil {
+							log.Error(err)
+						}
+					}
+				}()
+			}
+			
+		}
+	}
+	
 	listenSocks()
 }
 

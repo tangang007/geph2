@@ -4,34 +4,34 @@ import (
 	"io/ioutil"
 	"bufio"
 	"os"
+	"regexp"
 	"strings"
 	"net/http"
 	log "github.com/sirupsen/logrus"
 	"github.com/miekg/dns"
 )
 
+var SourceConfigs map[string]ListSource
+
 var ExtraList map[string]bool
 
-func ExtralistParse(content []byte, pattern string) (string, error) {
+
+func ExtralistFilter(content []byte, pattern *regexp.Regexp) (string, error) {
+	log.Info("IN ExtralistFilter")
 	var result strings.Builder
-	switch pattern {
-	case "dnsmasq-china-list":
-		log.Debug("Parsing dnsmasq-china-list updates")
-		scanner := bufio.NewScanner(strings.NewReader(string(content)))
-		for scanner.Scan() {
-			domain := strings.Split(scanner.Text(), "/")[1]
-			if _, ok := dns.IsDomainName(domain); !ok {
-				log.Infof("%v is not a valid domain name", domain)
-				continue
-			}
-			result.WriteString(domain)
+	scanner := bufio.NewScanner(strings.NewReader(string(content)))
+	for scanner.Scan() {
+		line := scanner.Text()
+		log.Info("LINE:", line)
+		log.Info("PATTERN:", pattern)
+		matches := pattern.FindStringSubmatch(line)
+		log.Info("MATCHES", matches)
+		if len(matches) != 0 {
+			result.WriteString(matches[0])
 			result.WriteString("\n")
 		}
-		return result.String(), nil
-	default:
-		log.Infof("Unknown pattern [%v]", pattern)
-		return result.String(), nil
 	}
+	return result.String(), nil
 }
 
 func LoadExtralist(source string) error {	
@@ -62,8 +62,8 @@ func LoadExtralist(source string) error {
 	return err
 }
 
-func UpdateExtraList(url string, target string, pattern string) error {
-	resp, err := http.Get(url)
+func UpdateExtraList(url string, target string, pattern *regexp.Regexp,client *http.Client) error {
+	resp, err := client.Get(url)
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,8 @@ func UpdateExtraList(url string, target string, pattern string) error {
 		return err
 	}
 
-	parsed, err := ExtralistParse(content, pattern)
+	parsed, err := ExtralistFilter(content, pattern)
+	log.Infoln("Parsed:", parsed)
 	if err != nil {
 		return err
 	}
