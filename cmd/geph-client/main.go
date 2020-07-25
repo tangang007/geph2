@@ -271,10 +271,10 @@ func main() {
 		proxy_addr,_ := url.Parse(fmt.Sprintf("http://%s",httpAddr))
 		download_client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxy_addr)}}
 		for _, cfg := range extralist.SourceConfigs {
-			if cfg.Dst() != "" {
+			if _, err := os.Stat(cfg.Dst()); os.IsNotExist(err) && cfg.Dst() != "" {
 				log.Infof("Loading %v...", cfg.Dst())
 				extralist.LoadExtralist(cfg.Dst())
-			} 
+			}
 			if cfg.Url() != "" {
 				go UpdateSource(cfg, download_client)
 			}
@@ -294,17 +294,33 @@ func dialTun(dest string) (conn net.Conn, err error) {
 	return
 }
 
+func UpdateDetail(cfg extralist.ListSource, client *http.Client) error {
+	log.Infof("Update %v from %v", cfg.Dst(), cfg.Url())
+	start := time.Now()
+	err := extralist.UpdateExtraList(cfg.Url(), cfg.Dst(), cfg.Pattern(), client)
+	elapsed := time.Since(start)
+	log.Infof("Update cost %v", elapsed)
+	if err != nil {
+		log.Error(err)
+	}
+	return err
+}
 
 func UpdateSource(cfg extralist.ListSource, client *http.Client) {
-	for {
-		log.Infof("Update %v from %v", cfg.Dst(), cfg.Url())
-		time.Sleep(cfg.Interval())
-		start := time.Now()
-		err := extralist.UpdateExtraList(cfg.Url(), cfg.Dst(), cfg.Pattern(), client)
-		elapsed := time.Since(start)
-		log.Infof("Update cost %v", elapsed)
-		if err != nil {
-			log.Error(err)
+	if cfg.Dst() != "" {
+		if _, err := os.Stat(cfg.Dst()); os.IsNotExist(err) {
+			log.Infoln("Sleeping 10s before updating cache ", cfg.Dst())
+			time.Sleep(time.Second * 10)
+			UpdateDetail(cfg, client)
 		}
+	} else {
+		log.Infoln("Sleeping 10s before updating cache ", cfg.Url())
+		time.Sleep(time.Second * 10)
+		UpdateDetail(cfg, client)
+	}
+	for {		
+		time.Sleep(cfg.Interval())
+		UpdateDetail(cfg, client)
+		
 	}
 }

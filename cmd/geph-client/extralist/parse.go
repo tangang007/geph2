@@ -77,12 +77,8 @@ func ParseSource(source *ini.Section) (ListSource,error) {
 		_, err := os.Stat(src.dst)
 		if err != nil {
 			if os.IsNotExist(err) {
-				log.Infof("File [%v] does not exists, creating a new one", src.dst)
-				_, err := os.Create(src.dst)
-				if err != nil {
-					log.Error("Failed to create file:", src.dst)
-					return src, err
-				}
+				log.Infof("File [%v] does not exists, will creating a new one", src.dst)
+				err = nil
 			} else {
 				return src, err
 			}
