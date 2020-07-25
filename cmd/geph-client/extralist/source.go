@@ -10,14 +10,16 @@ type list_interface interface {
 	Pattern() *regexp.Regexp
 	Dst() string
 	Bypass() bool
+	CIDR() bool
 	Interval() time.Duration
 } 
 
 type ListSource struct {
 	url string // update upstream url
-	pattern regexp.Regexp // patterns for everyline in upstream contents
+	pattern *regexp.Regexp // patterns for everyline in upstream contents
 	dst string // destination file path
 	bypass bool // bypass or proxy
+	cidr bool
 	interval time.Duration
 }
 
@@ -28,7 +30,7 @@ func (src *ListSource) Url() string {
 
 
 func (src *ListSource) Pattern() *regexp.Regexp {
-	return &src.pattern
+	return src.pattern
 }
 
 
@@ -42,6 +44,6 @@ func (src *ListSource) Bypass() bool {
 }
 
 
-func (src *ListSource) Interval() *time.Duration {
-	return &src.interval
+func (src *ListSource) Interval() time.Duration {
+	return src.interval
 }

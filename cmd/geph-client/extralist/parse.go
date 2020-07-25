@@ -36,14 +36,24 @@ func ParseConfigFile(path string) error {
 
 func ParseSource(source *ini.Section) (ListSource,error) {
 	var src ListSource
-	if source.HasKey("url") {
+	if source.HasKey("url") && source.Key("url") != nil {
 		log.Infof("Source [%v] will be updated from:[%v]", source.Name(), source.Key("url"))
 		src.url = source.Key("url").String()
 
 		// regex pattern only affects if url exists
-		if source.HasKey("pattern") {
+		if source.HasKey("pattern") && source.Key("pattern") != nil {
 			log.Infof("Source [%v] will be formatted by regexp: [%v]", source.Name(), source.Key("pattern"))
-			src.pattern = *regexp.MustCompile(source.Key("pattern").Value())
+			src.pattern = regexp.MustCompile(source.Key("pattern").Value())
+		}
+	} else {
+		src.url = ""
+	}
+
+	if source.HasKey("mode") {
+		if source.Key("mode").String() == "CIDR" {
+			src.cidr = true
+		} else {
+			src.cidr = false
 		}
 	}
 

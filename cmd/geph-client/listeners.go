@@ -184,10 +184,16 @@ func bypassHost(str string) bool {
 			return true
 		}
 		bypass, err := locallist.IsLocalList(str)
+
+		if !bypass {
+			log.Infof("%v not in locallist", str);
+		}
+
 		if err != nil {
 			log.Error("Error while matching CIDR:", err)
 			return false
 		}
+		
 		return bypass
 	}
 	

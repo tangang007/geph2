@@ -271,27 +271,15 @@ func main() {
 		proxy_addr,_ := url.Parse(fmt.Sprintf("http://%s",httpAddr))
 		download_client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxy_addr)}}
 		for _, cfg := range extralist.SourceConfigs {
+			if cfg.Dst() != "" {
+				log.Infof("Loading %v...", cfg.Dst())
+				extralist.LoadExtralist(cfg.Dst())
+			} 
 			if cfg.Url() != "" {
-				log.Printf("Updating ExtraList from [%v] to file [%v] using pattern [%v]", cfg.Url(), cfg.Dst(), cfg.Pattern())
-				err := extralist.UpdateExtraList(cfg.Url(), cfg.Dst(), cfg.Pattern(), download_client)
-				if err != nil {
-					log.Error(err)
-				}
-				go func() {
-					for {
-						time.Sleep(time.Second * 20)
-						start := time.Now()
-						err := extralist.UpdateExtraList(cfg.Url(), cfg.Dst(), cfg.Pattern(), download_client)
-						elapsed := time.Since(start)
-						log.Infof("Update cost %v", elapsed)
-						if err != nil {
-							log.Error(err)
-						}
-					}
-				}()
+				go UpdateSource(cfg, download_client)
 			}
-			
 		}
+		
 	}
 	
 	listenSocks()
@@ -304,4 +292,19 @@ func dialTun(dest string) (conn net.Conn, err error) {
 	}
 	conn, err = sks.Dial("tcp", dest)
 	return
+}
+
+
+func UpdateSource(cfg extralist.ListSource, client *http.Client) {
+	for {
+		log.Infof("Update %v from %v", cfg.Dst(), cfg.Url())
+		time.Sleep(cfg.Interval())
+		start := time.Now()
+		err := extralist.UpdateExtraList(cfg.Url(), cfg.Dst(), cfg.Pattern(), client)
+		elapsed := time.Since(start)
+		log.Infof("Update cost %v", elapsed)
+		if err != nil {
+			log.Error(err)
+		}
+	}
 }
