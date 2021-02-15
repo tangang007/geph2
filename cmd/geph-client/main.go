@@ -53,7 +53,7 @@ var forceWarpfront bool
 
 var bindClient *bdclient.Client
 
-var sWrap *multipool
+var sWrap commandDialer
 
 // GitVersion is the build version
 var GitVersion string
